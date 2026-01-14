@@ -38,25 +38,33 @@
         timeline: false,
       });
 
-      (async () => {
-        try {
-          // IMPORTANT: this must match the asset selected in your token settings
-          const assetId = 1446854;
+     (async () => {
+  try {
+    const assetId = 1446854;
 
-          const resource = await Cesium.IonResource.fromAssetId(assetId);
-          const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
-            clampToGround: true,
-          });
+    const resource = await Cesium.IonResource.fromAssetId(assetId);
+    const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
+      clampToGround: true,
+    });
 
-          viewer.dataSources.add(dataSource);
-          viewer.zoomTo(dataSource);
-        } catch (e) {
-          console.error(e);
-          document.body.innerHTML =
-            "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
-            (e?.stack || e?.message || e) + "</pre>";
-        }
-      })();
+    viewer.dataSources.add(dataSource);
+
+    // ✅ zoom to dataset
+    const target = await viewer.zoomTo(dataSource);
+
+    // ✅ make the Home button return to the dataset view
+    viewer.homeButton.viewModel.command.beforeExecute.addEventListener(function (e) {
+      e.cancel = true;
+      viewer.flyTo(dataSource);
+    });
+
+  } catch (e) {
+    console.error(e);
+    document.body.innerHTML =
+      "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
+      (e?.stack || e?.message || e) + "</pre>";
+  }
+})();
     </script>
   </body>
 </html>
