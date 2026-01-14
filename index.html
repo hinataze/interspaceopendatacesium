@@ -49,10 +49,10 @@
 
     viewer.dataSources.add(dataSource);
 
-    // ✅ zoom to dataset
+    // zoom to dataset
     const target = await viewer.zoomTo(dataSource);
 
-    // ✅ make the Home button return to the dataset view
+    // make the Home button return to the dataset view
     viewer.homeButton.viewModel.command.beforeExecute.addEventListener(function (e) {
       e.cancel = true;
       viewer.flyTo(dataSource);
