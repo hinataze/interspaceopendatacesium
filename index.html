@@ -25,24 +25,38 @@
   <body>
     <div id="cesiumContainer"></div>
 
-    <script>
-      Cesium.Ion.defaultAccessToken = "PASTE_YOUR_DEFAULT_TOKEN_HERE";
+   <script>
+  Cesium.Ion.defaultAccessToken = "PASTE_YOUR_DEFAULT_TOKEN_HERE";
 
-      const viewer = new Cesium.Viewer("cesiumContainer", {
-        terrain: Cesium.Terrain.fromWorldTerrain(),
-        animation: false,
-        timeline: false,
+  const viewer = new Cesium.Viewer("cesiumContainer", {
+    terrain: Cesium.Terrain.fromWorldTerrain(),
+    animation: false,
+    timeline: false,
+  });
+
+  (async () => {
+    try {
+      console.log("Loading ion asset 2185454...");
+
+      const resource = await Cesium.IonResource.fromAssetId(2185454);
+      console.log("Ion resource:", resource);
+
+      const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
+        clampToGround: true,
       });
 
-      (async () => {
-        const resource = await Cesium.IonResource.fromAssetId(2185454);
-        const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
-          clampToGround: true,
-        });
+      await viewer.dataSources.add(dataSource);
 
-        viewer.dataSources.add(dataSource);
-        viewer.zoomTo(dataSource);
-      })();
-    </script>
+      // Helpful debug
+      console.log("Entities loaded:", dataSource.entities.values.length);
+
+      await viewer.zoomTo(dataSource);
+
+    } catch (e) {
+      console.error("FAILED to load GeoJSON:", e);
+      alert("FAILED to load GeoJSON. Open DevTools Console for details.");
+    }
+  })();
+</script>
   </body>
 </html>
