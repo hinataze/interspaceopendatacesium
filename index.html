@@ -25,88 +25,38 @@
   <body>
     <div id="cesiumContainer"></div>
 
-   <script>
-  Cesium.Ion.defaultAccessToken = "<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cesium Embed</title>
+    <script>
+      // Use the correct ion API endpoint
+      Cesium.Ion.defaultServer = "https://api.cesium.com/";
 
-    <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
-    <link
-      href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css"
-      rel="stylesheet"
-    />
+      // Paste your RESTRICTED token here (not the whole HTML!)
+      Cesium.Ion.defaultAccessToken = "PASTE_SHARE_TEST_PARCELS_TOKEN_HERE";
 
-    <style>
-      html, body, #cesiumContainer {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="cesiumContainer"></div>
-
-   <script>
-  Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
-
-  const viewer = new Cesium.Viewer("cesiumContainer", {
-    terrain: Cesium.Terrain.fromWorldTerrain(),
-    animation: false,
-    timeline: false,
-  });
-
-  (async () => {
-    try {
-      console.log("Loading ion asset 2185454...");
-
-      const resource = await Cesium.IonResource.fromAssetId(2185454);
-      console.log("Ion resource:", resource);
-
-      const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
-        clampToGround: true,
+      const viewer = new Cesium.Viewer("cesiumContainer", {
+        terrain: Cesium.Terrain.fromWorldTerrain(),
+        animation: false,
+        timeline: false,
       });
 
-      await viewer.dataSources.add(dataSource);
+      (async () => {
+        try {
+          // IMPORTANT: this must match the asset selected in your token settings
+          const assetId = 1446854;
 
-      // Helpful debug
-      console.log("Entities loaded:", dataSource.entities.values.length);
+          const resource = await Cesium.IonResource.fromAssetId(assetId);
+          const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
+            clampToGround: true,
+          });
 
-      await viewer.zoomTo(dataSource);
-
-    } catch (e) {
-      console.error("FAILED to load GeoJSON:", e);
-      alert("FAILED to load GeoJSON. Open DevTools Console for details.");
-    }
-  })();
-<script>
-  Cesium.Ion.defaultServer = "https://api.cesium.com/";
-  Cesium.Ion.defaultAccessToken = "YOUR_TOKEN";
-
-  const viewer = new Cesium.Viewer("cesiumContainer", {
-    terrain: Cesium.Terrain.fromWorldTerrain(),
-    animation: false,
-    timeline: false,
-  });
-
-  (async () => {
-    try {
-      const resource = await Cesium.IonResource.fromAssetId(2185454);
-      const dataSource = await Cesium.GeoJsonDataSource.load(resource, { clampToGround: true });
-      viewer.dataSources.add(dataSource);
-      viewer.zoomTo(dataSource);
-    } catch (e) {
-      document.body.innerHTML =
-        "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
-        (e?.stack || e?.message || e) + "</pre>";
-    }
-  })();
-</script>
+          viewer.dataSources.add(dataSource);
+          viewer.zoomTo(dataSource);
+        } catch (e) {
+          console.error(e);
+          document.body.innerHTML =
+            "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
+            (e?.stack || e?.message || e) + "</pre>";
+        }
+      })();
+    </script>
   </body>
 </html>
