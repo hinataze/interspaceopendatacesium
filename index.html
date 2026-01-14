@@ -84,7 +84,6 @@ if (points.length > 0) {
     });
 
     // Wait a tick so Cesium computes bounds, then zoom in closer than default
-    await Cesium.whenReady();
     await new Promise(r => setTimeout(r, 250));
 
     await viewer.zoomTo(
