@@ -49,13 +49,38 @@
 
     viewer.dataSources.add(dataSource);
 
-    // zoom to dataset
-    const target = await viewer.zoomTo(dataSource);
+    // Make it visible (temporary but useful)
+    dataSource.entities.values.forEach(e => {
+      if (e.polygon) {
+        e.polygon.material = Cesium.Color.YELLOW.withAlpha(0.35);
+        e.polygon.outline = true;
+        e.polygon.outlineColor = Cesium.Color.BLACK;
+      }
+      if (e.polyline) {
+        e.polyline.width = 3;
+        e.polyline.material = Cesium.Color.YELLOW;
+      }
+      if (e.point) {
+        e.point.pixelSize = 7;
+        e.point.color = Cesium.Color.YELLOW;
+      }
+    });
 
-    // make the Home button return to the dataset view
-    viewer.homeButton.viewModel.command.beforeExecute.addEventListener(function (e) {
+    // Wait a tick so Cesium computes bounds, then zoom in closer than default
+    await Cesium.whenReady();
+    await new Promise(r => setTimeout(r, 250));
+
+    await viewer.zoomTo(
+      dataSource,
+      new Cesium.HeadingPitchRange(0, -0.7, 1500) // <-- adjust range if needed
+    );
+
+    // Home button always returns to the dataset
+    viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
       e.cancel = true;
-      viewer.flyTo(dataSource);
+      viewer.flyTo(dataSource, {
+        offset: new Cesium.HeadingPitchRange(0, -0.7, 1500),
+      });
     });
 
   } catch (e) {
