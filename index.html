@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cesium Embed</title>
+    <title>Cesium Parcels (ion GeoJSON)</title>
 
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
@@ -26,86 +26,111 @@
     <div id="cesiumContainer"></div>
 
     <script>
-      // Use the correct ion API endpoint
+      // Optional (CesiumJS already defaults to api.cesium.com, but keep it explicit)
       Cesium.Ion.defaultServer = "https://api.cesium.com/";
 
-      // Paste your RESTRICTED token here (not the whole HTML!)
-      Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
+      // 🔒 Replace with your (restricted) token
+      Cesium.Ion.defaultAccessToken = "PASTE_YOUR_TOKEN_HERE";
 
       const viewer = new Cesium.Viewer("cesiumContainer", {
-        terrain: Cesium.Terrain.fromWorldTerrain(),
+        terrain: Cesium.Terrain.fromWorldTerrain(), // uses ion asset 1
         animation: false,
         timeline: false,
+        baseLayerPicker: false,
+        geocoder: false,
+        sceneModePicker: true,
+        navigationHelpButton: false,
+        infoBox: true,
+        selectionIndicator: true,
       });
 
-     (async () => {
-  try {
-    const assetId = 1446854;
+      (async () => {
+        try {
+          const assetId = 1446854; // Parcels GeoJSON
 
-    const resource = await Cesium.IonResource.fromAssetId(assetId);
-    const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
-      clampToGround: true,
-    });
+          const resource = await Cesium.IonResource.fromAssetId(assetId);
+          const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
+            clampToGround: true,
+          });
 
-    viewer.dataSources.add(dataSource);
+          await viewer.dataSources.add(dataSource);
 
-    const entities = dataSource.entities.values;
-console.log("Entities loaded:", entities.length);
+          // Make the GeoJSON clearly visible
+          const ents = dataSource.entities.values;
+          for (const e of ents) {
+            if (e.polygon) {
+              e.polygon.material = Cesium.Color.YELLOW.withAlpha(0.35);
+              e.polygon.outline = true;
+              e.polygon.outlineColor = Cesium.Color.BLACK;
+              e.polygon.outlineWidth = 2;
+            }
+            if (e.polyline) {
+              e.polyline.width = 3;
+              e.polyline.material = Cesium.Color.YELLOW;
+            }
+            if (e.point) {
+              e.point.pixelSize = 7;
+              e.point.color = Cesium.Color.YELLOW;
+            }
+          }
 
-const points = [];
-for (const e of entities) {
-  const p =
-    e.position?.getValue(Cesium.JulianDate.now()) ||
-    e.polygon?.hierarchy?.getValue(Cesium.JulianDate.now())?.positions?.[0] ||
-    e.polyline?.positions?.getValue(Cesium.JulianDate.now())?.[0];
-  if (p) points.push(p);
-}
+          // Small wait so positions are ready
+          await new Promise((r) => setTimeout(r, 300));
 
-if (points.length > 0) {
-  const bs = Cesium.BoundingSphere.fromPoints(points);
-  console.log("BoundingSphere radius (m):", bs.radius);
-}
+          // Compute dataset rectangle and fly to it (reliable for GeoJSON)
+          const time = Cesium.JulianDate.now();
+          let rect = null;
 
-    // Make it visible (temporary but useful)
-    dataSource.entities.values.forEach(e => {
-      if (e.polygon) {
-        e.polygon.material = Cesium.Color.YELLOW.withAlpha(0.35);
-        e.polygon.outline = true;
-        e.polygon.outlineColor = Cesium.Color.BLACK;
-      }
-      if (e.polyline) {
-        e.polyline.width = 3;
-        e.polyline.material = Cesium.Color.YELLOW;
-      }
-      if (e.point) {
-        e.point.pixelSize = 7;
-        e.point.color = Cesium.Color.YELLOW;
-      }
-    });
+          for (const e of ents) {
+            if (e.polygon && e.polygon.hierarchy) {
+              const h = e.polygon.hierarchy.getValue(time);
+              if (h?.positions?.length) {
+                const r2 = Cesium.Rectangle.fromCartesianArray(h.positions);
+                rect = rect ? Cesium.Rectangle.union(rect, r2, rect) : r2;
+              }
+            }
+          }
 
-    // Wait a tick so Cesium computes bounds, then zoom in closer than default
-    await new Promise(r => setTimeout(r, 250));
+          // Add padding so it isn't too tight
+          const padDeg = 0.001; // ~111m latitude
+          const pad = Cesium.Math.toRadians(padDeg);
 
-    await viewer.zoomTo(
-      dataSource,
-      new Cesium.HeadingPitchRange(0, -0.7, 1500) // <-- adjust range if needed
-    );
+          if (rect) {
+            const padded = new Cesium.Rectangle(
+              rect.west - pad,
+              rect.south - pad,
+              rect.east + pad,
+              rect.north + pad
+            );
 
-    // Home button always returns to the dataset
-    viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
-      e.cancel = true;
-      viewer.flyTo(dataSource, {
-        offset: new Cesium.HeadingPitchRange(0, -0.7, 1500),
-      });
-    });
+            viewer.camera.flyTo({
+              destination: padded,
+              duration: 0.0,
+            });
 
-  } catch (e) {
-    console.error(e);
-    document.body.innerHTML =
-      "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
-      (e?.stack || e?.message || e) + "</pre>";
-  }
-})();
+            // Home button returns to dataset
+            viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
+              e.cancel = true;
+              viewer.camera.flyTo({ destination: padded, duration: 0.0 });
+            });
+          } else {
+            // Fallback
+            await viewer.flyTo(dataSource, { duration: 0.0 });
+            viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
+              e.cancel = true;
+              viewer.flyTo(dataSource, { duration: 0.0 });
+            });
+          }
+
+          console.log("Loaded entities:", ents.length);
+        } catch (err) {
+          console.error(err);
+          document.body.innerHTML =
+            "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
+            (err?.stack || err?.message || err) +
+            "</pre>";
+        }
+      })();
     </script>
   </body>
 </html>
