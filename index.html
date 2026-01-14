@@ -49,6 +49,23 @@
 
     viewer.dataSources.add(dataSource);
 
+    const entities = dataSource.entities.values;
+console.log("Entities loaded:", entities.length);
+
+const points = [];
+for (const e of entities) {
+  const p =
+    e.position?.getValue(Cesium.JulianDate.now()) ||
+    e.polygon?.hierarchy?.getValue(Cesium.JulianDate.now())?.positions?.[0] ||
+    e.polyline?.positions?.getValue(Cesium.JulianDate.now())?.[0];
+  if (p) points.push(p);
+}
+
+if (points.length > 0) {
+  const bs = Cesium.BoundingSphere.fromPoints(points);
+  console.log("BoundingSphere radius (m):", bs.radius);
+}
+
     // Make it visible (temporary but useful)
     dataSource.entities.values.forEach(e => {
       if (e.polygon) {
