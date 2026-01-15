@@ -36,8 +36,8 @@
         baseLayerPicker: false,
         geocoder: false,
         navigationHelpButton: false,
-        infoBox: true,
-        selectionIndicator: true,
+        infoBox: false,
+        selectionIndicator: false,
       });
 
       (async () => {
@@ -49,34 +49,25 @@
 
           await tileset.readyPromise;
 
-          // Optional: better point cloud look
+          // Better point cloud look (optional)
           tileset.pointCloudShading = new Cesium.PointCloudShading({
             attenuation: true,
             geometricErrorScale: 1.0,
             maximumAttenuation: 6.0,
           });
 
-          // Focus camera on the dataset
+          // Camera offset (tweak range by changing multiplier)
           const bs = tileset.boundingSphere;
-          const range = Math.max(50.0, bs.radius * 1.5);
-          const offset = new Cesium.HeadingPitchRange(
-            Cesium.Math.toRadians(0),
-            Cesium.Math.toRadians(-35),
-            range
-          );
+          const range = Math.max(50.0, bs.radius * 1.8);
+          const offset = new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), range);
 
-          await viewer.camera.flyToBoundingSphere(bs, {
-            offset,
-            duration: 0.0,
-          });
+          // Reliable focus
+          await viewer.zoomTo(tileset, offset);
 
           // Home button returns to dataset
           viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
             e.cancel = true;
-            viewer.camera.flyToBoundingSphere(bs, {
-              offset,
-              duration: 0.8,
-            });
+            viewer.flyTo(tileset, { offset, duration: 0.8 });
           });
 
         } catch (err) {
