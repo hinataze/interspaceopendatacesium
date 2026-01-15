@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cesium Debug</title>
+    <title>Cesium (ion 3D Tiles) - Focus</title>
 
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
@@ -12,70 +12,81 @@
     />
 
     <style>
-      html, body, #cesiumContainer { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
-      #dbg {
-        position:absolute; top:10px; left:10px; z-index:9999;
-        max-width: 420px;
-        background: rgba(0,0,0,0.75); color:#fff; padding:10px 12px;
-        border-radius:10px; font: 12px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-        white-space: pre-wrap;
+      html, body, #cesiumContainer {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
       }
     </style>
   </head>
 
   <body>
     <div id="cesiumContainer"></div>
-    <div id="dbg">Starting…</div>
 
     <script>
-      const dbg = (msg) => {
-        const el = document.getElementById("dbg");
-        el.textContent += "\n" + msg;
-      };
-
       Cesium.Ion.defaultServer = "https://api.cesium.com/";
-      Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
+      Cesium.Ion.defaultAccessToken = "YOUR_TOKEN_HERE";
+
+      const viewer = new Cesium.Viewer("cesiumContainer", {
+        terrain: Cesium.Terrain.fromWorldTerrain(),
+        animation: false,
+        timeline: false,
+        baseLayerPicker: false,
+        geocoder: false,
+        navigationHelpButton: false,
+        infoBox: true,
+        selectionIndicator: true,
+      });
 
       (async () => {
         try {
-          dbg("Token length: " + (Cesium.Ion.defaultAccessToken || "").length);
+          const assetId = ASSET_ID_HERE; // <-- e.g. 4346556
 
-          // 1) Directly test ion endpoint (this is what CesiumJS calls internally)
-          const testAssetId = 1446854;
-          const url =
-            `https://api.cesium.com/v1/assets/${testAssetId}/endpoint?access_token=` +
-            encodeURIComponent(Cesium.Ion.defaultAccessToken);
+          // Load tileset
+          const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetId);
+          viewer.scene.primitives.add(tileset);
 
-          const r = await fetch(url, { method: "GET" });
-          dbg("Ion endpoint HTTP: " + r.status);
+          // Wait until Cesium has computed bounds / metadata
+          await tileset.readyPromise;
 
-          const text = await r.text();
-          dbg("Ion endpoint body (first 300 chars):\n" + text.slice(0, 300));
-
-          if (!r.ok) {
-            dbg("\nSTOP: ion rejected the token or asset access. Fix token/scopes/resources.");
-            return;
-          }
-
-          // 2) If ion endpoint test passes, proceed to load normally
-          const viewer = new Cesium.Viewer("cesiumContainer", {
-            terrain: Cesium.Terrain.fromWorldTerrain(),
-            animation: false,
-            timeline: false,
-            baseLayerPicker: false,
-            geocoder: false,
-            sceneModePicker: true,
-            navigationHelpButton: false,
+          // Optional: improve appearance for point clouds
+          tileset.pointCloudShading = new Cesium.PointCloudShading({
+            attenuation: true,
+            geometricErrorScale: 1.0,
+            maximumAttenuation: 6.0,
           });
 
-          const resource = await Cesium.IonResource.fromAssetId(testAssetId);
-          const ds = await Cesium.GeoJsonDataSource.load(resource, { clampToGround: true });
-          await viewer.dataSources.add(ds);
-          await viewer.zoomTo(ds);
+          // Focus camera on dataset (tight + nice angle)
+          const bs = tileset.boundingSphere;
+          const range = Math.max(50.0, bs.radius * 2.0); // adjust "2.0" to zoom in/out
+          const offset = new Cesium.HeadingPitchRange(
+            Cesium.Math.toRadians(0),
+            Cesium.Math.toRadians(-35),
+            range
+          );
 
-          dbg("\nLoaded GeoJSON OK ✅");
-        } catch (e) {
-          dbg("\nException:\n" + (e?.stack || e?.message || e));
+          await viewer.camera.flyToBoundingSphere(bs, {
+            offset,
+            duration: 0.0, // instant; set to 1.5 if you want animation
+          });
+
+          // Make Home button always return to the dataset
+          viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
+            e.cancel = true;
+            viewer.camera.flyToBoundingSphere(bs, {
+              offset,
+              duration: 0.8,
+            });
+          });
+
+        } catch (err) {
+          console.error(err);
+          document.body.innerHTML =
+            "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
+            (err?.stack || err?.message || err) +
+            "</pre>";
         }
       })();
     </script>
