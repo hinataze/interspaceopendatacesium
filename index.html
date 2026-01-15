@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cesium Parcels (ion GeoJSON)</title>
+    <title>Cesium Debug</title>
 
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
@@ -12,125 +12,70 @@
     />
 
     <style>
-      html,
-      body,
-      #cesiumContainer {
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
+      html, body, #cesiumContainer { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
+      #dbg {
+        position:absolute; top:10px; left:10px; z-index:9999;
+        max-width: 420px;
+        background: rgba(0,0,0,0.75); color:#fff; padding:10px 12px;
+        border-radius:10px; font: 12px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+        white-space: pre-wrap;
       }
     </style>
   </head>
 
   <body>
     <div id="cesiumContainer"></div>
+    <div id="dbg">Starting…</div>
 
     <script>
-      // Cesium ion API endpoint
+      const dbg = (msg) => {
+        const el = document.getElementById("dbg");
+        el.textContent += "\n" + msg;
+      };
+
       Cesium.Ion.defaultServer = "https://api.cesium.com/";
-
-      // 🔒 Put your token here
-      Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
-
-      const viewer = new Cesium.Viewer("cesiumContainer", {
-        terrain: Cesium.Terrain.fromWorldTerrain(),
-        animation: false,
-        timeline: false,
-        baseLayerPicker: false,
-        geocoder: false,
-        sceneModePicker: true,
-        navigationHelpButton: false,
-        infoBox: true,
-        selectionIndicator: true,
-      });
+      Cesium.Ion.defaultAccessToken = "PASTE_YOUR_TOKEN_HERE";
 
       (async () => {
         try {
-          const assetId = 1446854; // Parcels GeoJSON
+          dbg("Token length: " + (Cesium.Ion.defaultAccessToken || "").length);
 
-          const resource = await Cesium.IonResource.fromAssetId(assetId);
-          const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
-            clampToGround: true,
+          // 1) Directly test ion endpoint (this is what CesiumJS calls internally)
+          const testAssetId = 1446854;
+          const url =
+            `https://api.cesium.com/v1/assets/${testAssetId}/endpoint?access_token=` +
+            encodeURIComponent(Cesium.Ion.defaultAccessToken);
+
+          const r = await fetch(url, { method: "GET" });
+          dbg("Ion endpoint HTTP: " + r.status);
+
+          const text = await r.text();
+          dbg("Ion endpoint body (first 300 chars):\n" + text.slice(0, 300));
+
+          if (!r.ok) {
+            dbg("\nSTOP: ion rejected the token or asset access. Fix token/scopes/resources.");
+            return;
+          }
+
+          // 2) If ion endpoint test passes, proceed to load normally
+          const viewer = new Cesium.Viewer("cesiumContainer", {
+            terrain: Cesium.Terrain.fromWorldTerrain(),
+            animation: false,
+            timeline: false,
+            baseLayerPicker: false,
+            geocoder: false,
+            sceneModePicker: true,
+            navigationHelpButton: false,
           });
 
-          await viewer.dataSources.add(dataSource);
+          const resource = await Cesium.IonResource.fromAssetId(testAssetId);
+          const ds = await Cesium.GeoJsonDataSource.load(resource, { clampToGround: true });
+          await viewer.dataSources.add(ds);
+          await viewer.zoomTo(ds);
 
-          // Make the GeoJSON visible
-          const ents = dataSource.entities.values;
-          for (const e of ents) {
-            if (e.polygon) {
-              e.polygon.material = Cesium.Color.YELLOW.withAlpha(0.35);
-              e.polygon.outline = true;
-              e.polygon.outlineColor = Cesium.Color.BLACK;
-              e.polygon.outlineWidth = 2;
-            }
-            if (e.polyline) {
-              e.polyline.width = 3;
-              e.polyline.material = Cesium.Color.YELLOW;
-            }
-            if (e.point) {
-              e.point.pixelSize = 7;
-              e.point.color = Cesium.Color.YELLOW;
-            }
-          }
-
-          // Wait a moment so Cesium computes bounds
-          await new Promise((r) => setTimeout(r, 300));
-
-          // Compute dataset rectangle and fly to it
-          const time = Cesium.JulianDate.now();
-          let rect = null;
-
-          for (const e of ents) {
-            if (e.polygon && e.polygon.hierarchy) {
-              const h = e.polygon.hierarchy.getValue(time);
-              if (h?.positions?.length) {
-                const r2 = Cesium.Rectangle.fromCartesianArray(h.positions);
-                rect = rect ? Cesium.Rectangle.union(rect, r2, rect) : r2;
-              }
-            }
-          }
-
-          // Add padding
-          const padDeg = 0.001; // ~111m latitude
-          const pad = Cesium.Math.toRadians(padDeg);
-
-          if (rect) {
-            const padded = new Cesium.Rectangle(
-              rect.west - pad,
-              rect.south - pad,
-              rect.east + pad,
-              rect.north + pad
-            );
-
-            viewer.camera.flyTo({
-              destination: padded,
-              duration: 0.0,
-            });
-
-            // Home button returns to dataset
-            viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
-              e.cancel = true;
-              viewer.camera.flyTo({ destination: padded, duration: 0.0 });
-            });
-          } else {
-            // Fallback
-            await viewer.flyTo(dataSource, { duration: 0.0 });
-            viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
-              e.cancel = true;
-              viewer.flyTo(dataSource, { duration: 0.0 });
-            });
-          }
-
-          console.log("Loaded entities:", ents.length);
-        } catch (err) {
-          console.error(err);
-          document.body.innerHTML =
-            "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
-            (err?.stack || err?.message || err) +
-            "</pre>";
+          dbg("\nLoaded GeoJSON OK ✅");
+        } catch (e) {
+          dbg("\nException:\n" + (e?.stack || e?.message || e));
         }
       })();
     </script>
