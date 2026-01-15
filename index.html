@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cesium (ion 3D Tiles) - Focus</title>
+    <title>Cesium Point Cloud (Focus)</title>
 
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
@@ -42,25 +42,23 @@
 
       (async () => {
         try {
-          const assetId = ASSET_ID_HERE; // <-- e.g. 4346556
+          const assetId = 4346556;
 
-          // Load tileset
           const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetId);
           viewer.scene.primitives.add(tileset);
 
-          // Wait until Cesium has computed bounds / metadata
           await tileset.readyPromise;
 
-          // Optional: improve appearance for point clouds
+          // Optional: better point cloud look
           tileset.pointCloudShading = new Cesium.PointCloudShading({
             attenuation: true,
             geometricErrorScale: 1.0,
             maximumAttenuation: 6.0,
           });
 
-          // Focus camera on dataset (tight + nice angle)
+          // Focus camera on the dataset
           const bs = tileset.boundingSphere;
-          const range = Math.max(50.0, bs.radius * 2.0); // adjust "2.0" to zoom in/out
+          const range = Math.max(50.0, bs.radius * 1.5);
           const offset = new Cesium.HeadingPitchRange(
             Cesium.Math.toRadians(0),
             Cesium.Math.toRadians(-35),
@@ -69,10 +67,10 @@
 
           await viewer.camera.flyToBoundingSphere(bs, {
             offset,
-            duration: 0.0, // instant; set to 1.5 if you want animation
+            duration: 0.0,
           });
 
-          // Make Home button always return to the dataset
+          // Home button returns to dataset
           viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
             e.cancel = true;
             viewer.camera.flyToBoundingSphere(bs, {
