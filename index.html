@@ -29,7 +29,7 @@
       // Optional (CesiumJS already defaults to api.cesium.com, but keep it explicit)
       Cesium.Ion.defaultServer = "https://api.cesium.com/";
 
-      // 🔒 Replace with your (restricted) token
+      // ? Replace with your (restricted) token
       Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
 
       const viewer = new Cesium.Viewer("cesiumContainer", {
@@ -44,6 +44,23 @@
         selectionIndicator: true,
       });
 
+      // Load point cloud tilesets
+      (async () => {
+        try {
+          // AUTO-GENERATED POINT CLOUDS - DO NOT REMOVE THIS COMMENT
+          // Point cloud: s20251225_200844f184.las (uploaded 2026-01-15)
+          const tileset4350865 = await Cesium.Cesium3DTileset.fromIonAssetId(4350865);
+          viewer.scene.primitives.add(tileset4350865);
+
+          // Point cloud: s20251225_200421f41.las (uploaded 2026-01-15)
+          const tileset4350867 = await Cesium.Cesium3DTileset.fromIonAssetId(4350867);
+          viewer.scene.primitives.add(tileset4350867);
+        } catch (err) {
+          console.error('Error loading point clouds:', err);
+        }
+      })();
+
+      // Load GeoJSON parcels
       (async () => {
         try {
           const assetId = 1446854; // Parcels GeoJSON
