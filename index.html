@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cesium Parcels (ion GeoJSON)</title>
+    <title>Interspace Open Data (Cesium)</title>
 
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
@@ -19,21 +19,101 @@
         padding: 0;
         overflow: hidden;
       }
+
+      /* Small control panel */
+      #panel {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 9999;
+        background: rgba(0,0,0,0.65);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font: 14px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        max-width: 320px;
+      }
+      #panel h3 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      .row input[type="checkbox"] { transform: scale(1.1); }
+      .hint { opacity: 0.85; font-size: 12px; margin-top: 8px; }
+      .btnrow { display:flex; gap:8px; margin-top: 10px; }
+      button {
+        cursor: pointer;
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-weight: 600;
+      }
+      #status {
+        margin-top: 8px;
+        font-size: 12px;
+        opacity: 0.9;
+        white-space: pre-wrap;
+      }
     </style>
   </head>
 
   <body>
     <div id="cesiumContainer"></div>
 
-    <script>
-      // Optional (CesiumJS already defaults to api.cesium.com, but keep it explicit)
-      Cesium.Ion.defaultServer = "https://api.cesium.com/";
+    <div id="panel">
+      <h3>Datasets</h3>
 
-      // ? Replace with your (restricted) token
-      Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
+      <div class="row">
+        <input id="cb_parcels" type="checkbox" checked />
+        <label for="cb_parcels">Parcels (GeoJSON)</label>
+      </div>
+
+      <div class="row">
+        <input id="cb_4350872" type="checkbox" checked />
+        <label for="cb_4350872">Point cloud 4350872</label>
+      </div>
+
+      <div class="row">
+        <input id="cb_4350873" type="checkbox" checked />
+        <label for="cb_4350873">Point cloud 4350873</label>
+      </div>
+
+      <div class="row">
+        <input id="cb_4350865" type="checkbox" checked />
+        <label for="cb_4350865">Point cloud 4350865</label>
+      </div>
+
+      <div class="row">
+        <input id="cb_4350867" type="checkbox" checked />
+        <label for="cb_4350867">Point cloud 4350867</label>
+      </div>
+
+      <div class="btnrow">
+        <button id="btn_showall">Show all</button>
+        <button id="btn_hideall">Hide all</button>
+        <button id="btn_home">Focus</button>
+      </div>
+
+      <div class="hint">Tip: “Focus” flies to parcels extent (fallback: first loaded cloud).</div>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      // Optional explicit server
+      Cesium.Ion.defaultServer = "https://api.cesium.com/";
+      Cesium.Ion.defaultAccessToken = "PASTE_YOUR_TOKEN_HERE";
+
+      const statusEl = document.getElementById("status");
+      const setStatus = (s) => { statusEl.textContent = s || ""; };
 
       const viewer = new Cesium.Viewer("cesiumContainer", {
-        terrain: Cesium.Terrain.fromWorldTerrain(), // uses ion asset 1
+        terrain: Cesium.Terrain.fromWorldTerrain(),
         animation: false,
         timeline: false,
         baseLayerPicker: false,
@@ -44,67 +124,83 @@
         selectionIndicator: true,
       });
 
-      // Load point cloud tilesets
-      (async () => {
-        try {
-          // AUTO-GENERATED POINT CLOUDS - DO NOT REMOVE THIS COMMENT
-          // Point cloud: s20251225_200421f41.las (uploaded 2026-01-15)
-          const tileset4350872 = await Cesium.Cesium3DTileset.fromIonAssetId(4350872);
-          viewer.scene.primitives.add(tileset4350872);
+      // --- State holders ---
+      let parcelsDataSource = null;
+      const tilesets = new Map(); // assetId -> tileset instance
 
-          // Point cloud: s20251225_200844f184.las (uploaded 2026-01-15)
-          const tileset4350873 = await Cesium.Cesium3DTileset.fromIonAssetId(4350873);
-          viewer.scene.primitives.add(tileset4350873);
-          // Point cloud: s20251225_200844f184.las (uploaded 2026-01-15)
-          const tileset4350865 = await Cesium.Cesium3DTileset.fromIonAssetId(4350865);
-          viewer.scene.primitives.add(tileset4350865);
+      // --- Helpers ---
+      async function ensureParcelsLoaded() {
+        if (parcelsDataSource) return parcelsDataSource;
 
-          // Point cloud: s20251225_200421f41.las (uploaded 2026-01-15)
-          const tileset4350867 = await Cesium.Cesium3DTileset.fromIonAssetId(4350867);
-          viewer.scene.primitives.add(tileset4350867);
-        } catch (err) {
-          console.error('Error loading point clouds:', err);
-        }
-      })();
+        const parcelsAssetId = 1446854;
+        setStatus("Loading parcels…");
 
-      // Load GeoJSON parcels
-      (async () => {
-        try {
-          const assetId = 1446854; // Parcels GeoJSON
+        const resource = await Cesium.IonResource.fromAssetId(parcelsAssetId);
+        const ds = await Cesium.GeoJsonDataSource.load(resource, { clampToGround: true });
+        parcelsDataSource = ds;
 
-          const resource = await Cesium.IonResource.fromAssetId(assetId);
-          const dataSource = await Cesium.GeoJsonDataSource.load(resource, {
-            clampToGround: true,
-          });
+        await viewer.dataSources.add(ds);
 
-          await viewer.dataSources.add(dataSource);
-
-          // Make the GeoJSON clearly visible
-          const ents = dataSource.entities.values;
-          for (const e of ents) {
-            if (e.polygon) {
-              e.polygon.material = Cesium.Color.YELLOW.withAlpha(0.35);
-              e.polygon.outline = true;
-              e.polygon.outlineColor = Cesium.Color.BLACK;
-              e.polygon.outlineWidth = 2;
-            }
-            if (e.polyline) {
-              e.polyline.width = 3;
-              e.polyline.material = Cesium.Color.YELLOW;
-            }
-            if (e.point) {
-              e.point.pixelSize = 7;
-              e.point.color = Cesium.Color.YELLOW;
-            }
+        // Style for visibility
+        const ents = ds.entities.values;
+        for (const e of ents) {
+          if (e.polygon) {
+            e.polygon.material = Cesium.Color.YELLOW.withAlpha(0.35);
+            e.polygon.outline = true;
+            e.polygon.outlineColor = Cesium.Color.BLACK;
+            e.polygon.outlineWidth = 2;
           }
+          if (e.polyline) {
+            e.polyline.width = 3;
+            e.polyline.material = Cesium.Color.YELLOW;
+          }
+          if (e.point) {
+            e.point.pixelSize = 7;
+            e.point.color = Cesium.Color.YELLOW;
+          }
+        }
 
-          // Small wait so positions are ready
-          await new Promise((r) => setTimeout(r, 300));
+        setStatus("");
+        return ds;
+      }
 
-          // Compute dataset rectangle and fly to it (reliable for GeoJSON)
+      function setParcelsVisible(visible) {
+        if (!parcelsDataSource) return;
+        const ents = parcelsDataSource.entities.values;
+        for (const e of ents) {
+          if (e.polygon) e.polygon.show = visible;
+          if (e.polyline) e.polyline.show = visible;
+          if (e.point) e.point.show = visible;
+        }
+      }
+
+      async function ensureTilesetLoaded(assetId) {
+        if (tilesets.has(assetId)) return tilesets.get(assetId);
+
+        setStatus(`Loading point cloud ${assetId}…`);
+        const ts = await Cesium.Cesium3DTileset.fromIonAssetId(assetId);
+        viewer.scene.primitives.add(ts);
+        await ts.readyPromise;
+
+        tilesets.set(assetId, ts);
+        setStatus("");
+        return ts;
+      }
+
+      function setTilesetVisible(assetId, visible) {
+        const ts = tilesets.get(assetId);
+        if (ts) ts.show = visible;
+      }
+
+      async function focus() {
+        // Prefer focusing parcels extent (nice stable camera target)
+        if (document.getElementById("cb_parcels").checked) {
+          const ds = parcelsDataSource || (await ensureParcelsLoaded());
+          const ents = ds.entities.values;
+
+          // Compute rectangle bounds (reliable)
           const time = Cesium.JulianDate.now();
           let rect = null;
-
           for (const e of ents) {
             if (e.polygon && e.polygon.hierarchy) {
               const h = e.polygon.hierarchy.getValue(time);
@@ -114,45 +210,108 @@
               }
             }
           }
-
-          // Add padding so it isn't too tight
-          const padDeg = 0.001; // ~111m latitude
-          const pad = Cesium.Math.toRadians(padDeg);
-
           if (rect) {
+            const pad = Cesium.Math.toRadians(0.001);
             const padded = new Cesium.Rectangle(
-              rect.west - pad,
-              rect.south - pad,
-              rect.east + pad,
-              rect.north + pad
+              rect.west - pad, rect.south - pad, rect.east + pad, rect.north + pad
             );
+            viewer.camera.flyTo({ destination: padded, duration: 0.0 });
+            return;
+          }
+        }
 
-            viewer.camera.flyTo({
-              destination: padded,
-              duration: 0.0,
-            });
+        // Fallback: focus first visible tileset
+        for (const [id, ts] of tilesets.entries()) {
+          if (ts.show) {
+            await viewer.zoomTo(ts, new Cesium.HeadingPitchRange(0, -0.6, 80));
+            return;
+          }
+        }
+      }
 
-            // Home button returns to dataset
-            viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
-              e.cancel = true;
-              viewer.camera.flyTo({ destination: padded, duration: 0.0 });
-            });
-          } else {
-            // Fallback
-            await viewer.flyTo(dataSource, { duration: 0.0 });
-            viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
-              e.cancel = true;
-              viewer.flyTo(dataSource, { duration: 0.0 });
-            });
+      // --- Wire up UI ---
+      async function onToggleParcels() {
+        const checked = document.getElementById("cb_parcels").checked;
+        if (checked) {
+          await ensureParcelsLoaded();
+          setParcelsVisible(true);
+        } else {
+          setParcelsVisible(false);
+        }
+      }
+
+      async function onToggleCloud(assetId) {
+        const cb = document.getElementById(`cb_${assetId}`);
+        const checked = cb.checked;
+
+        if (checked) {
+          const ts = await ensureTilesetLoaded(assetId);
+          ts.show = true;
+        } else {
+          setTilesetVisible(assetId, false);
+        }
+      }
+
+      document.getElementById("cb_parcels").addEventListener("change", onToggleParcels);
+
+      const cloudIds = [4350872, 4350873, 4350865, 4350867];
+      for (const id of cloudIds) {
+        document.getElementById(`cb_${id}`).addEventListener("change", () => onToggleCloud(id));
+      }
+
+      document.getElementById("btn_showall").addEventListener("click", async () => {
+        document.getElementById("cb_parcels").checked = true;
+        await onToggleParcels();
+
+        for (const id of cloudIds) {
+          document.getElementById(`cb_${id}`).checked = true;
+          await onToggleCloud(id);
+        }
+      });
+
+      document.getElementById("btn_hideall").addEventListener("click", async () => {
+        document.getElementById("cb_parcels").checked = false;
+        await onToggleParcels();
+
+        for (const id of cloudIds) {
+          document.getElementById(`cb_${id}`).checked = false;
+          await onToggleCloud(id);
+        }
+      });
+
+      document.getElementById("btn_home").addEventListener("click", focus);
+
+      // --- Initial load: match default checkbox state ---
+      (async () => {
+        try {
+          // Load parcels if checked
+          if (document.getElementById("cb_parcels").checked) {
+            await ensureParcelsLoaded();
           }
 
-          console.log("Loaded entities:", ents.length);
+          // Load clouds that are checked
+          for (const id of cloudIds) {
+            if (document.getElementById(`cb_${id}`).checked) {
+              const ts = await ensureTilesetLoaded(id);
+              ts.show = true;
+            }
+          }
+
+          // Focus on startup
+          await new Promise(r => setTimeout(r, 200));
+          await focus();
+
+          // Make Home button do the same as Focus
+          viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
+            e.cancel = true;
+            focus();
+          });
+
         } catch (err) {
           console.error(err);
           document.body.innerHTML =
             "<pre style='white-space:pre-wrap;font-size:14px;padding:20px'>" +
-            (err?.stack || err?.message || err) +
-            "</pre>";
+            (err?.stack || err?.message || err) + "</pre>";
         }
       })();
     </script>
