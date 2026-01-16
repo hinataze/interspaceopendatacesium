@@ -4,21 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cesium GeoJSON (Focus + Home)</title>
+
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
       href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css"
       rel="stylesheet"
     />
+
     <style>
       html, body, #cesiumContainer { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
     </style>
   </head>
+
   <body>
     <div id="cesiumContainer"></div>
+
     <script>
       Cesium.Ion.defaultServer = "https://api.cesium.com/";
-      Cesium.Ion.defaultAccessToken ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
-      
+      Cesium.Ion.defaultAccessToken = "PASTE_YOUR_TOKEN_HERE";
+
       const viewer = new Cesium.Viewer("cesiumContainer", {
         terrain: Cesium.Terrain.fromWorldTerrain(),
         animation: false,
@@ -29,15 +33,16 @@
         infoBox: false,
         selectionIndicator: false,
       });
-      
+
       (async () => {
         try {
-          const assetId = 1446854; // GeoJSON parcels
+          const assetId = 1446854;
+
           const resource = await Cesium.IonResource.fromAssetId(assetId);
           const dataSource = await Cesium.GeoJsonDataSource.load(resource, { clampToGround: true });
           await viewer.dataSources.add(dataSource);
-          
-          // Style
+
+          // Style (optional)
           const ents = dataSource.entities.values;
           for (const e of ents) {
             if (e.polygon) {
@@ -45,34 +50,57 @@
               e.polygon.outline = true;
               e.polygon.outlineColor = Cesium.Color.BLACK;
             }
+            if (e.polyline) {
+              e.polyline.width = 3;
+              e.polyline.material = Cesium.Color.YELLOW;
+            }
+            if (e.point) {
+              e.point.pixelSize = 7;
+              e.point.color = Cesium.Color.YELLOW;
+            }
           }
-          
-          // Compute bounding sphere from all entities
-          const boundingSphere = Cesium.BoundingSphere.fromPoints(
-            ents.flatMap(e => {
-              if (e.polygon && e.polygon.hierarchy) {
-                const positions = e.polygon.hierarchy.getValue(Cesium.JulianDate.now()).positions;
-                return positions || [];
+
+          // Give Cesium a moment to finalize entity geometry
+          await new Promise((r) => setTimeout(r, 200));
+
+          // ✅ Primary: zoomTo datasource (most reliable for GeoJSON)
+          const offset = new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-35), 1500);
+          try {
+            await viewer.zoomTo(dataSource, offset);
+          } catch (e) {
+            // ✅ Fallback: compute a rectangle from polygon positions
+            const time = Cesium.JulianDate.now();
+            let rect = null;
+
+            for (const ent of ents) {
+              const h = ent.polygon?.hierarchy?.getValue?.(time);
+              if (h?.positions?.length) {
+                const r2 = Cesium.Rectangle.fromCartesianArray(h.positions);
+                rect = rect ? Cesium.Rectangle.union(rect, r2, rect) : r2;
               }
-              return [];
-            })
-          );
-          
-          // Fly to the bounding sphere with some offset
-          await viewer.camera.flyToBoundingSphere(boundingSphere, {
-            duration: 0,
-            offset: new Cesium.HeadingPitchRange(0, -Math.PI / 4, boundingSphere.radius * 2.5)
-          });
-          
-          // Wait a tick
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
-          // Capture camera position for home button
+            }
+
+            if (rect) {
+              // pad a bit
+              const pad = Cesium.Math.toRadians(0.001);
+              const padded = new Cesium.Rectangle(
+                rect.west - pad,
+                rect.south - pad,
+                rect.east + pad,
+                rect.north + pad
+              );
+              viewer.camera.flyTo({ destination: padded, duration: 0.0 });
+            } else {
+              // last resort
+              await viewer.flyTo(dataSource, { duration: 0.0 });
+            }
+          }
+
+          // ✅ Save the exact initial view for Home
           const homePosition = viewer.camera.positionWC.clone();
           const homeDirection = viewer.camera.directionWC.clone();
           const homeUp = viewer.camera.upWC.clone();
-          
-          // Override home button behavior
+
           viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
             e.cancel = true;
             viewer.camera.flyTo({
@@ -81,7 +109,7 @@
               duration: 0.8,
             });
           });
-          
+
         } catch (err) {
           console.error(err);
           document.body.innerHTML =
