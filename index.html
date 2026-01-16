@@ -47,11 +47,25 @@
             }
           }
           
-          // Zoom to GeoJSON
-          await viewer.zoomTo(dataSource);
+          // Compute bounding sphere from all entities
+          const boundingSphere = Cesium.BoundingSphere.fromPoints(
+            ents.flatMap(e => {
+              if (e.polygon && e.polygon.hierarchy) {
+                const positions = e.polygon.hierarchy.getValue(Cesium.JulianDate.now()).positions;
+                return positions || [];
+              }
+              return [];
+            })
+          );
           
-          // Wait for zoom animation to complete
-          await new Promise(resolve => setTimeout(resolve, 150));
+          // Fly to the bounding sphere with some offset
+          await viewer.camera.flyToBoundingSphere(boundingSphere, {
+            duration: 0,
+            offset: new Cesium.HeadingPitchRange(0, -Math.PI / 4, boundingSphere.radius * 2.5)
+          });
+          
+          // Wait a tick
+          await new Promise(resolve => setTimeout(resolve, 50));
           
           // Capture camera position for home button
           const homePosition = viewer.camera.positionWC.clone();
