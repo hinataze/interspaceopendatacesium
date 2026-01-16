@@ -4,27 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cesium GeoJSON (Focus + Home)</title>
-
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
     <link
       href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css"
       rel="stylesheet"
     />
-
     <style>
       html, body, #cesiumContainer { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
     </style>
   </head>
-
   <body>
     <div id="cesiumContainer"></div>
-
     <script>
       Cesium.Ion.defaultServer = "https://api.cesium.com/";
-
-            Cesium.Ion.defaultAccessToken ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
-
-
+      Cesium.Ion.defaultAccessToken ="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxYThlNWVlZS1lZjMwLTQwMTUtOThjNy1mYWI5ZTNlMTg1M2IiLCJpZCI6MTE3NDExLCJpYXQiOjE3NjgzNzQ1OTF9.Gg3i6Lh85yI9VNGAwtDThAJUbZKwXvAztVEiM1h3vjw";
+      
       const viewer = new Cesium.Viewer("cesiumContainer", {
         terrain: Cesium.Terrain.fromWorldTerrain(),
         animation: false,
@@ -35,15 +29,14 @@
         infoBox: false,
         selectionIndicator: false,
       });
-
+      
       (async () => {
         try {
           const assetId = 1446854; // GeoJSON parcels
-
           const resource = await Cesium.IonResource.fromAssetId(assetId);
           const dataSource = await Cesium.GeoJsonDataSource.load(resource, { clampToGround: true });
           await viewer.dataSources.add(dataSource);
-
+          
           // Style
           const ents = dataSource.entities.values;
           for (const e of ents) {
@@ -53,14 +46,19 @@
               e.polygon.outlineColor = Cesium.Color.BLACK;
             }
           }
-
-          // Zoom to GeoJSON then save camera as Home
+          
+          // Zoom to GeoJSON
           await viewer.zoomTo(dataSource);
-
+          
+          // Wait for zoom animation to complete
+          await new Promise(resolve => setTimeout(resolve, 150));
+          
+          // Capture camera position for home button
           const homePosition = viewer.camera.positionWC.clone();
           const homeDirection = viewer.camera.directionWC.clone();
           const homeUp = viewer.camera.upWC.clone();
-
+          
+          // Override home button behavior
           viewer.homeButton.viewModel.command.beforeExecute.addEventListener((e) => {
             e.cancel = true;
             viewer.camera.flyTo({
@@ -69,7 +67,7 @@
               duration: 0.8,
             });
           });
-
+          
         } catch (err) {
           console.error(err);
           document.body.innerHTML =
@@ -80,7 +78,3 @@
     </script>
   </body>
 </html>
-
-
-
-
